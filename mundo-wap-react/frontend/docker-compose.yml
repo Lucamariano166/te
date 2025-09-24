@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  app:
+    image: node:18.17.0-alpine3.18
+    container_name: mw-react-test
+    environment:
+      - WDS_SOCKET_HOST=127.0.0.1 
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true 
+    command: sh -c "yarn start"
+    stdin_open: true
+    ports:
+      - '3000:3000'
+    working_dir: /app
+    volumes:
+      - ./:/app
