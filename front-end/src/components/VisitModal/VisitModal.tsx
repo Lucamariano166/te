@@ -129,20 +129,31 @@ export function VisitModal() {
       const cepData = await CepService.lookup(maskedCep);
       setCepLoading(false);
 
-      if (cepData) {
+      if (cepData && cepData.logradouro && cepData.bairro) {
         setFormData(prev => ({
           ...prev,
           address: {
             ...prev.address,
             postal_code: cepData.cep,
-            sublocality: cepData.bairro || '',
-            street: cepData.logradouro || '',
+            sublocality: cepData.bairro,
+            street: cepData.logradouro,
           },
         }));
+        setErrors(prev => ({
+          ...prev,
+          'address.postal_code': '',
+          'address.sublocality': '',
+          'address.street': '',
+        }));
       } else {
-        showToast('CEP não encontrado', 'error');
+        setErrors(prev => ({
+          ...prev,
+          'address.postal_code': 'CEP não encontrado ou incompleto',
+        }));
+        showToast('CEP não encontrado ou incompleto', 'error');
       }
     }
+
   };
 
   const validateForm = (): boolean => {

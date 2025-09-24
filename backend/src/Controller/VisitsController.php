@@ -1,7 +1,10 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Controller;
+
+use App\Service\CepService;
 
 /**
  * Visits Controller
@@ -10,50 +13,28 @@ namespace App\Controller;
  */
 class VisitsController extends AppController
 {
-    /**
-     * Inicialização do controller
-     *
-     * @return void
-     */
+    private CepService $cepService;
+
     public function initialize(): void
     {
         parent::initialize();
-        // RequestHandler component não é mais necessário no CakePHP 5.x
-        // $this->loadComponent('RequestHandler');
+        $this->cepService = new CepService();
     }
 
     /**
      * Index method - listar visitas com filtro obrigatório por data
-     *
-     * @return \Cake\Http\Response|null|void Renders view
      */
     public function index()
     {
         $this->request->allowMethod(['get']);
-
         $date = $this->request->getQuery('date');
 
         if (empty($date)) {
-            return $this->response
-                ->withType('application/json')
-                ->withStringBody(json_encode([
-                    'success' => false,
-                    'message' => 'Parâmetro date é obrigatório',
-                    'error' => 'MISSING_DATE_PARAMETER'
-                ]))
-                ->withStatus(400);
+            return $this->jsonError('Parâmetro date é obrigatório', 'MISSING_DATE_PARAMETER', 400);
         }
 
-        // Validar formato da data
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-            return $this->response
-                ->withType('application/json')
-                ->withStringBody(json_encode([
-                    'success' => false,
-                    'message' => 'Data deve estar no formato YYYY-MM-DD',
-                    'error' => 'INVALID_DATE_FORMAT'
-                ]))
-                ->withStatus(400);
+            return $this->jsonError('Data deve estar no formato YYYY-MM-DD', 'INVALID_DATE_FORMAT', 400);
         }
 
         $visits = $this->Visits->find()
@@ -62,94 +43,79 @@ class VisitsController extends AppController
             ->orderBy(['Visits.created' => 'ASC'])
             ->toArray();
 
-        return $this->response
-            ->withType('application/json')
-            ->withStringBody(json_encode([
-                'success' => true,
-                'data' => $visits,
-                'count' => count($visits)
-            ]));
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => $visits,
+            'count' => count($visits)
+        ]);
     }
 
     /**
      * Add method - criar nova visita
-     *
-     * @return \Cake\Http\Response|null|void Renders view
      */
     public function add()
     {
         $this->request->allowMethod(['post']);
-
         $data = $this->request->getData();
 
-        // Validar campos obrigatórios
-        $requiredFields = ['date', 'forms', 'products', 'address'];
-        foreach ($requiredFields as $field) {
-            if (!isset($data[$field])) {
-                return $this->response
-                    ->withType('application/json')
-                    ->withStringBody(json_encode([
-                        'success' => false,
-                        'message' => "Campo {$field} é obrigatório",
-                        'error' => 'MISSING_REQUIRED_FIELD'
-                    ]))
-                    ->withStatus(400);
+        // Campos obrigatórios
+        foreach (['date', 'forms', 'products', 'address'] as $field) {
+            if (empty($data[$field])) {
+                return $this->jsonError("Campo {$field} é obrigatório", 'MISSING_REQUIRED_FIELD', 400);
             }
         }
+        if (!isset($data['completed'])) {
+            $data['completed'] = false;
+        }
 
-        // Validar endereço
-        if (!isset($data['address']['postal_code'])) {
-            return $this->response
-                ->withType('application/json')
-                ->withStringBody(json_encode([
-                    'success' => false,
-                    'message' => 'CEP do endereço é obrigatório',
-                    'error' => 'MISSING_POSTAL_CODE'
-                ]))
-                ->withStatus(400);
+
+        $postalCode = $data['address']['postal_code'] ?? null;
+        if (!$postalCode) {
+            return $this->jsonError('CEP não informado', 'MISSING_POSTAL_CODE', 400);
+        }
+
+        $postalCodeClean = $this->cepService->cleanPostalCode($postalCode);
+
+        if (!$this->cepService->isValidFormat($postalCodeClean)) {
+            return $this->jsonError('CEP inválido', 'INVALID_POSTAL_CODE', 400);
+        }
+
+        $cepData = $this->cepService->lookup($postalCodeClean);
+        if (!$cepData || empty($cepData['street'])) {
+            return $this->jsonError('CEP não encontrado', 'POSTAL_CODE_NOT_FOUND', 404);
+        }
+
+
+        $addressData = $data['address'];
+        foreach (['sublocality', 'street', 'city', 'state'] as $field) {
+            if (empty($addressData[$field]) && !empty($cepData[$field])) {
+                $addressData[$field] = $cepData[$field];
+            }
         }
 
         $connection = $this->Visits->getConnection();
         $connection->begin();
 
         try {
-            // Criar endereço
             $addressesTable = $this->fetchTable('Addresses');
-            $address = $addressesTable->newEntity($data['address']);
+            $address = $addressesTable->newEntity($addressData);
 
             if (!$addressesTable->save($address)) {
                 $connection->rollback();
-                return $this->response
-                    ->withType('application/json')
-                    ->withStringBody(json_encode([
-                        'success' => false,
-                        'message' => 'Erro ao salvar endereço',
-                        'errors' => $address->getErrors()
-                    ]))
-                    ->withStatus(400);
+                return $this->jsonError('Erro ao salvar endereço', 'ADDRESS_SAVE_ERROR', 400, $address->getErrors());
             }
 
-            // Criar visita
-            $visitData = [
+            $visit = $this->Visits->newEntity([
                 'date' => $data['date'],
                 'forms' => (int)$data['forms'],
                 'products' => (int)$data['products'],
                 'completed' => $data['completed'] ?? false,
                 'address_id' => $address->id
-            ];
-
-            $visit = $this->Visits->newEntity($visitData);
+            ]);
 
             if (!$this->Visits->save($visit)) {
                 $connection->rollback();
-                return $this->response
-                    ->withType('application/json')
-                    ->withStringBody(json_encode([
-                        'success' => false,
-                        'message' => 'Erro ao salvar visita',
-                        'errors' => $visit->getErrors()
-                    ]))
-                    ->withStatus(400);
+                return $this->jsonError('Erro ao salvar visita', 'VISIT_SAVE_ERROR', 400, $visit->getErrors());
             }
 
             $connection->commit();
@@ -157,154 +123,39 @@ class VisitsController extends AppController
             // Recarregar com endereço
             $visit = $this->Visits->get($visit->id, ['contain' => ['Addresses']]);
 
-            return $this->response
-                ->withType('application/json')
-                ->withStringBody(json_encode([
-                    'success' => true,
-                    'message' => 'Visita criada com sucesso',
-                    'data' => $visit
-                ]))
-                ->withStatus(201);
-
+            return $this->jsonResponse([
+                'success' => true,
+                'message' => 'Visita criada com sucesso',
+                'data' => $visit
+            ], 201);
         } catch (\Exception $e) {
             $connection->rollback();
-            return $this->response
-                ->withType('application/json')
-                ->withStringBody(json_encode([
-                    'success' => false,
-                    'message' => 'Erro interno do servidor',
-                    'error' => $e->getMessage()
-                ]))
-                ->withStatus(500);
+            return $this->jsonError('Erro interno do servidor', 'INTERNAL_SERVER_ERROR', 500, ['exception' => $e->getMessage()]);
         }
     }
 
-    /**
-     * Edit method - editar visita existente
-     *
-     * @param string|null $id Visit id.
-     * @return \Cake\Http\Response|null|void Renders view
-     */
-    public function edit($id = null)
+    // -----------------------
+    // Helper methods JSON
+    // -----------------------
+    private function jsonResponse(array $data, int $status = 200)
     {
-        $this->request->allowMethod(['put', 'patch']);
-
-        $visit = $this->Visits->get($id, ['contain' => ['Addresses']]);
-        $data = $this->request->getData();
-
-        $connection = $this->Visits->getConnection();
-        $connection->begin();
-
-        try {
-            // Se endereço foi alterado, criar novo (não editar)
-            if (isset($data['address'])) {
-                $addressesTable = $this->fetchTable('Addresses');
-
-                // Criar novo endereço
-                $newAddress = $addressesTable->newEntity($data['address']);
-
-                if (!$addressesTable->save($newAddress)) {
-                    $connection->rollback();
-                    return $this->response
-                        ->withType('application/json')
-                        ->withStringBody(json_encode([
-                            'success' => false,
-                            'message' => 'Erro ao salvar novo endereço',
-                            'errors' => $newAddress->getErrors()
-                        ]))
-                        ->withStatus(400);
-                }
-
-                $oldAddressId = $visit->address_id;
-                $data['address_id'] = $newAddress->id;
-
-                // Remover address dos dados para não tentar atualizar
-                unset($data['address']);
-
-                // Agendar remoção do endereço antigo se não usado
-                $shouldRemoveOldAddress = true;
-            }
-
-            // Atualizar visita
-            $visit = $this->Visits->patchEntity($visit, $data);
-
-            if (!$this->Visits->save($visit)) {
-                $connection->rollback();
-                return $this->response
-                    ->withType('application/json')
-                    ->withStringBody(json_encode([
-                        'success' => false,
-                        'message' => 'Erro ao atualizar visita',
-                        'errors' => $visit->getErrors()
-                    ]))
-                    ->withStatus(400);
-            }
-
-            // Remover endereço antigo se não está sendo usado
-            if (isset($shouldRemoveOldAddress) && $shouldRemoveOldAddress) {
-                $usageCount = $this->Visits->find()
-                    ->where(['address_id' => $oldAddressId])
-                    ->count();
-
-                if ($usageCount === 0) {
-                    $oldAddress = $addressesTable->get($oldAddressId);
-                    $addressesTable->delete($oldAddress);
-                }
-            }
-
-            $connection->commit();
-
-            // Recarregar com endereço
-            $visit = $this->Visits->get($visit->id, ['contain' => ['Addresses']]);
-
-            return $this->response
-                ->withType('application/json')
-                ->withStringBody(json_encode([
-                    'success' => true,
-                    'message' => 'Visita atualizada com sucesso',
-                    'data' => $visit
-                ]));
-
-        } catch (\Exception $e) {
-            $connection->rollback();
-            return $this->response
-                ->withType('application/json')
-                ->withStringBody(json_encode([
-                    'success' => false,
-                    'message' => 'Erro interno do servidor',
-                    'error' => $e->getMessage()
-                ]))
-                ->withStatus(500);
-        }
+        return $this->response
+            ->withType('application/json')
+            ->withStringBody(json_encode($data))
+            ->withStatus($status);
     }
 
-    /**
-     * Delete method - deletar visita
-     *
-     * @param string|null $id Visit id.
-     * @return \Cake\Http\Response|null|void Renders view
-     */
-    public function delete($id = null)
+    private function jsonError(string $message, string $errorCode, int $status = 400, array $errors = [])
     {
-        $this->request->allowMethod(['delete']);
-
-        $visit = $this->Visits->get($id);
-
-        if ($this->Visits->delete($visit)) {
-            return $this->response
-                ->withType('application/json')
-                ->withStringBody(json_encode([
-                    'success' => true,
-                    'message' => 'Visita deletada com sucesso'
-                ]));
-        } else {
-            return $this->response
-                ->withType('application/json')
-                ->withStringBody(json_encode([
-                    'success' => false,
-                    'message' => 'Erro ao deletar visita'
-                ]))
-                ->withStatus(400);
+        $response = [
+            'success' => false,
+            'message' => $message,
+            'error' => $errorCode
+        ];
+        if ($errors) {
+            $response['errors'] = $errors;
         }
+
+        return $this->jsonResponse($response, $status);
     }
 }
