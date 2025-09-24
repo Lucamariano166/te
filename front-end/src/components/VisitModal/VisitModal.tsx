@@ -158,11 +158,14 @@ export function VisitModal() {
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-
+    const today = new Date().toISOString().split('T')[0];
     if (!formData.date) {
       newErrors.date = 'Data é obrigatória';
     }
 
+    if (formData.date < today) {
+      newErrors.date = 'Não é permitido criar visitas para datas passadas';
+    }
     if (!formData.forms || formData.forms < 1) {
       newErrors.forms = 'Número de formulários deve ser maior que 0';
     }

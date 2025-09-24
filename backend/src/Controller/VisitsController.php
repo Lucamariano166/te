@@ -67,7 +67,18 @@ class VisitsController extends AppController
         if (!isset($data['completed'])) {
             $data['completed'] = false;
         }
-
+        // -----------------------
+        // Validação de data
+        // -----------------------
+        $visitDate = new \DateTime($data['date']);
+        $today = new \DateTime('today');
+        if ($visitDate < $today) {
+            return $this->jsonError(
+                'Não é permitido criar visitas para datas passadas',
+                'PAST_DATE_NOT_ALLOWED',
+                400
+            );
+        }
 
         $postalCode = $data['address']['postal_code'] ?? null;
         if (!$postalCode) {
