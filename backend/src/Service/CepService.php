@@ -158,7 +158,8 @@ class CepService
      */
     public function isValidFormat(string $postalCode): bool
     {
-        return (bool) preg_match('/^\d{5}-?\d{3}$/', $postalCode);
+        $clean = $this->cleanPostalCode($postalCode);
+        return strlen($clean) === 8;
     }
 
     /**

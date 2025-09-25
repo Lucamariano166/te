@@ -132,13 +132,17 @@ const StatsBar = styled.div`
   }
 `;
 
-const StatItem = styled.div`
+const StatItem = styled.div<{ clickable?: boolean }>`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.xs};
   font-size: ${theme.typography.fontSize.sm};
   color: ${theme.colors.gray[700]};
   font-weight: ${theme.typography.fontWeight.medium};
+  cursor: ${({ clickable }) => (clickable ? 'pointer' : 'default')};
+  &:hover {
+    opacity: ${({ clickable }) => (clickable ? 0.8 : 1)};
+  }
 `;
 
 const StatIcon = styled.span`
@@ -152,7 +156,7 @@ const StatNumber = styled.span`
 
 export function Header() {
   const { openModal } = useUI();
-  const { state } = useVisits();
+  const { state, setFilter } = useVisits(); // adicionar setFilter do contexto
 
   const handleNewVisit = () => {
     openModal('create');
@@ -174,17 +178,17 @@ export function Header() {
         </Logo>
 
         <StatsBar>
-          <StatItem>
+          <StatItem clickable onClick={() => setFilter('all')}>
             <StatIcon>📊</StatIcon>
             <StatNumber>{totalVisits}</StatNumber>
             <span>Visitas</span>
           </StatItem>
-          <StatItem>
+          <StatItem clickable onClick={() => setFilter('completed')}>
             <StatIcon>✅</StatIcon>
             <StatNumber>{completedVisits}</StatNumber>
             <span>Concluídas</span>
           </StatItem>
-          <StatItem>
+          <StatItem clickable onClick={() => setFilter('pending')}>
             <StatIcon>⏳</StatIcon>
             <StatNumber>{pendingVisits}</StatNumber>
             <span>Pendentes</span>

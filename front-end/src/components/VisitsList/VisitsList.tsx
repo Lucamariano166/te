@@ -113,7 +113,7 @@ const LoadingSpinner = styled.div`
 `;
 
 export function VisitsList() {
-  const { state, completeVisit } = useVisits();
+  const { state, completeVisit, getFilteredVisits } = useVisits();
   const { openModal, setLoading, showToast } = useUI();
 
   const handleEditVisit = (visitId: number) => {
@@ -138,7 +138,7 @@ export function VisitsList() {
       showToast('Dia fechado! Visitas pendentes foram realocadas.', 'success');
 
       // Refresh visits after reallocation
-      // This would trigger a refresh in the context
+      // Pode chamar loadVisits() aqui se necessário
 
     } catch (error) {
       showToast('Erro ao fechar o dia', 'error');
@@ -163,7 +163,9 @@ export function VisitsList() {
     );
   }
 
-  if (state.visits.length === 0) {
+  const filteredVisits = getFilteredVisits();
+
+  if (filteredVisits.length === 0) {
     return (
       <Container>
         <EmptyState>
@@ -184,10 +186,34 @@ export function VisitsList() {
     );
   }
 
+  // Agrupa as visitas filtradas por data
+  const groupedFilteredVisits = Object.values(filteredVisits).length
+    ? filteredVisits.reduce((groups, visit) => {
+      const date = visit.date;
+      if (!groups[date]) {
+        groups[date] = {
+          visits: [],
+          totalDuration: 0,
+          completedCount: 0,
+          totalCount: 0,
+          completionRate: 0,
+        };
+      }
+      groups[date].visits.push(visit);
+      groups[date].totalDuration += visit.duration;
+      groups[date].totalCount += 1;
+      if (visit.completed) groups[date].completedCount += 1;
+      groups[date].completionRate = Math.round(
+        (groups[date].completedCount / groups[date].totalCount) * 100
+      );
+      return groups;
+    }, {} as typeof state.groupedVisits)
+    : {};
+
   return (
     <Container>
       <VisitsContainer>
-        {Object.entries(state.groupedVisits)
+        {Object.entries(groupedFilteredVisits)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([date, group]) => (
             <VisitGroup
@@ -198,8 +224,7 @@ export function VisitsList() {
               onCompleteVisit={handleCompleteVisit}
               onCloseDay={handleCloseDay}
             />
-          ))
-        }
+          ))}
       </VisitsContainer>
     </Container>
   );
