@@ -236,6 +236,16 @@ export function VisitGroup({ date, group, onEditVisit, onCompleteVisit, onCloseD
     return theme.colors.primary.main;
   };
 
+  //fechar o dia
+
+  const handleCloseDay = () => {
+    if (group.totalCount === group.completedCount) {
+      onCloseDay(date);
+    } else {
+      alert('Só é possível fechar o dia quando todas as visitas estiverem concluídas.');
+    }
+  };
+
   const usagePercentage = (group.totalDuration / 480) * 100; // 480 min = 8 hours
   const completionRate = group.completionRate;
   const pendingCount = group.totalCount - group.completedCount;
@@ -253,9 +263,9 @@ export function VisitGroup({ date, group, onEditVisit, onCompleteVisit, onCloseD
           </DateInfo>
 
           {pendingCount === 0 && group.visits.length > 0 && (
-            <CloseButton onClick={() => onCloseDay(date)}>
-              Fechar Dia
-            </CloseButton>
+            <StatBadge >
+              <span>Dia Concluído</span> 
+            </StatBadge>
           )}
         </DateRow>
 

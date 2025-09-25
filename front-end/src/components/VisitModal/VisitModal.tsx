@@ -129,43 +129,29 @@ export function VisitModal() {
       const cepData = await CepService.lookup(maskedCep);
       setCepLoading(false);
 
-      if (cepData && cepData.logradouro && cepData.bairro) {
+      if (cepData) {
         setFormData(prev => ({
           ...prev,
           address: {
             ...prev.address,
             postal_code: cepData.cep,
-            sublocality: cepData.bairro,
-            street: cepData.logradouro,
+            sublocality: cepData.bairro || '',
+            street: cepData.logradouro || '',
           },
         }));
-        setErrors(prev => ({
-          ...prev,
-          'address.postal_code': '',
-          'address.sublocality': '',
-          'address.street': '',
-        }));
       } else {
-        setErrors(prev => ({
-          ...prev,
-          'address.postal_code': 'CEP não encontrado ou incompleto',
-        }));
-        showToast('CEP não encontrado ou incompleto', 'error');
+        showToast('CEP não encontrado', 'error');
       }
     }
-
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-    const today = new Date().toISOString().split('T')[0];
+
     if (!formData.date) {
       newErrors.date = 'Data é obrigatória';
     }
 
-    if (formData.date < today) {
-      newErrors.date = 'Não é permitido criar visitas para datas passadas';
-    }
     if (!formData.forms || formData.forms < 1) {
       newErrors.forms = 'Número de formulários deve ser maior que 0';
     }

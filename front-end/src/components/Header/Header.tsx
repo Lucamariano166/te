@@ -4,6 +4,8 @@ import { theme } from '../../styles/theme';
 import { Button } from '../styled/Button';
 import { useUI } from '../../contexts/UIContext';
 import { useVisits } from '../../contexts/VisitsContext';
+import logo from '../../assets/logo.png';
+
 
 const HeaderContainer = styled.header`
   background: ${theme.colors.background.card};
@@ -154,6 +156,13 @@ const StatNumber = styled.span`
   font-weight: ${theme.typography.fontWeight.bold};
 `;
 
+const LogoImage = styled.img`
+  width: 48px;
+  height: 48px;
+  border-radius: ${theme.borderRadius.xl};
+  object-fit: cover;
+`;
+
 export function Header() {
   const { openModal } = useUI();
   const { state, setFilter } = useVisits(); // adicionar setFilter do contexto
@@ -170,9 +179,9 @@ export function Header() {
     <HeaderContainer>
       <HeaderContent>
         <Logo>
-          <LogoIcon>✨</LogoIcon>
+          <LogoImage src={logo} alt="Logo Mundowap" />
           <LogoContent>
-            <LogoText>VisitPro</LogoText>
+            <LogoText>Mundowap</LogoText>
             <LogoSubtext>Agendador Profissional</LogoSubtext>
           </LogoContent>
         </Logo>
@@ -201,7 +210,7 @@ export function Header() {
             size="md"
             onClick={handleNewVisit}
           >
-            ✨ Nova Visita
+             Nova Visita
           </Button>
         </Actions>
       </HeaderContent>

@@ -3,7 +3,7 @@ export const theme = {
     // Instagram Color Palette
     instagram: {
       gradient: '#e6683c',
-      pink: '#E1306C',
+      pink: '#03013c',
       purple: '#bc1888',
       orange: '#F77737',
       yellow: '#FCAF45',
@@ -11,10 +11,10 @@ export const theme = {
       lightBlue: '#56CCF2',
     },
     primary: {
-      main: '#E1306C',
+      main: '#03013c',
       light: '#F77737',
       dark: '#bc1888',
-      gradient: ' #dc2743 ',
+      gradient: ' #03013c ',
       white: '#ffffff',
       black: '#262626',
     },
