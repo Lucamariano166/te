@@ -40,14 +40,12 @@ cepApi.interceptors.response.use(
 );
 
 // Helper para tratar respostas da API
-export const handleApiResponse = <T>(response: any): ApiResponse<T> => {
-  if (response.data && typeof response.data === 'object') {
-    return response.data;
-  }
-
+export function handleApiResponse<T>(response: any): ApiResponse<T> {
   return {
-    success: true,
-    data: response.data,
+    success: response.data.success,
+    data: response.data.data,
+    message: response.data.message,
+    errors: response.data.errors || {},
   };
 };
 
